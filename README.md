@@ -6,7 +6,8 @@ Regroupe tes titres Spotify likés par mois et crée une playlist privée pour c
 
 1. Crée une app sur le [dashboard développeur Spotify](https://developer.spotify.com/dashboard).
 2. Note le **Client ID**.
-3. Dans les paramètres de l'app, ajoute exactement cette Redirect URI : `http://localhost:5173/callback`.
+3. Dans les paramètres de l'app, ajoute exactement cette Redirect URI : `http://127.0.0.1:5173/callback`.
+   (Spotify n'autorise plus `localhost` en HTTP, il faut l'adresse de loopback explicite `127.0.0.1`.)
 4. Copie `.env.example` vers `.env.local` (déjà fait dans ce dépôt, `.env.local` est ignoré par git) et renseigne :
    ```
    VITE_SPOTIFY_CLIENT_ID=<ton_client_id>
@@ -26,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Ouvre `http://localhost:5173`, clique sur "Se connecter à Spotify", regroupe tes titres likés par mois, sélectionne les mois voulus puis crée les playlists.
+Ouvre `http://127.0.0.1:5173` (et non `localhost`, pour matcher la Redirect URI déclarée côté Spotify), clique sur "Se connecter à Spotify", regroupe tes titres likés par mois, sélectionne les mois voulus puis crée les playlists.
 
 **Note** : l'access token n'est jamais persisté (ni disque, ni storage) — il vit uniquement en mémoire le temps de la session. Un rechargement de page nécessite de se reconnecter.
 
