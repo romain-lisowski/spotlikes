@@ -9,7 +9,8 @@ export interface SpotifySavedTrackItem {
     id: string
     name: string
     uri: string
-    artists: { name: string }[]
+    artists: { id: string; name: string }[]
+    preview_url: string | null
   }
 }
 

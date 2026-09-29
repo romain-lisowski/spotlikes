@@ -8,11 +8,32 @@ vi.mock('@/services/spotifyApi', () => ({
   fetchAllLikedTracks: vi.fn<(accessToken: string) => Promise<LikedTrack[]>>(),
 }))
 
+vi.mock('@/services/lastfmApi', () => ({
+  fetchArtistsGenres:
+    vi.fn<(artists: { id: string; name: string }[]) => Promise<Map<string, string[]>>>(),
+}))
+
 import { fetchAllLikedTracks } from '@/services/spotifyApi'
+import { fetchArtistsGenres } from '@/services/lastfmApi'
+
+function likedTrack(id: string, addedAt: string): LikedTrack {
+  return {
+    id,
+    name: `T${id}`,
+    artist: 'A',
+    artistId: 'artist-1',
+    primaryArtistName: 'A',
+    previewUrl: null,
+    uri: `spotify:track:${id}`,
+    addedAt,
+    genres: [],
+  }
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  vi.mocked(fetchArtistsGenres).mockResolvedValue(new Map())
 })
 
 describe('useLikesStore', () => {
@@ -21,17 +42,45 @@ describe('useLikesStore', () => {
     await expect(store.fetchAll()).rejects.toThrow('Utilisateur non authentifié')
   })
 
-  it('fetchAll récupère les titres et les expose regroupés par mois', async () => {
+  it('fetchAll récupère les titres et les expose regroupés par trimestre, sans appeler les genres', async () => {
     useAuthStore().accessToken = 'token'
-    vi.mocked(fetchAllLikedTracks).mockResolvedValue([
-      { id: '1', name: 'T1', artist: 'A', uri: 'spotify:track:1', addedAt: '2026-09-01T00:00:00Z' },
-    ])
+    vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
 
     const store = useLikesStore()
     await store.fetchAll()
 
     expect(store.tracks).toHaveLength(1)
-    expect(store.monthGroups).toHaveLength(1)
-    expect(store.monthGroups[0]?.monthKey).toBe('2026-09')
+    expect(store.tracks[0]?.genres).toEqual([])
+    expect(fetchArtistsGenres).not.toHaveBeenCalled()
+
+    expect(store.groups).toHaveLength(1)
+    expect(store.groups[0]?.key).toBe('2026-Q3')
+  })
+
+  it('setGroupingMode vers un mode genre déclenche l’enrichissement des genres, une seule fois', async () => {
+    useAuthStore().accessToken = 'token'
+    vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
+    vi.mocked(fetchArtistsGenres).mockResolvedValue(new Map([['artist-1', ['indie pop']]]))
+
+    const store = useLikesStore()
+    await store.fetchAll()
+    await store.setGroupingMode('genre')
+
+    expect(store.groups[0]?.key).toBe('indie pop')
+    expect(fetchArtistsGenres).toHaveBeenCalledWith([{ id: 'artist-1', name: 'A' }])
+
+    await store.setGroupingMode('quarter-genre')
+    expect(fetchArtistsGenres).toHaveBeenCalledTimes(1)
+  })
+
+  it('setGroupingMode vers un mode temporel n’appelle pas les genres', async () => {
+    useAuthStore().accessToken = 'token'
+    vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
+
+    const store = useLikesStore()
+    await store.fetchAll()
+    await store.setGroupingMode('quarter')
+
+    expect(fetchArtistsGenres).not.toHaveBeenCalled()
   })
 })

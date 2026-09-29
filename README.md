@@ -1,6 +1,6 @@
 # Spotlikes
 
-Regroupe tes titres Spotify likés par mois et crée une playlist privée pour chacun des mois sélectionnés.
+Regroupe tes titres Spotify likés par trimestre et/ou par genre, et crée une playlist privée pour chacun des groupes sélectionnés.
 
 ## Configuration Spotify (à faire une seule fois)
 
@@ -15,6 +15,20 @@ Regroupe tes titres Spotify likés par mois et crée une playlist privée pour c
 
 Aucun secret n'est nécessaire : l'authentification utilise OAuth Authorization Code with PKCE, directement depuis le front.
 
+## Configuration Last.fm (pour le regroupement par genre)
+
+Spotify restreint l'accès aux données de genre pour les apps en Development Mode (quota très bas). Le genre est donc récupéré via l'API publique de Last.fm (`artist.getTopTags`), par nom d'artiste.
+
+1. Crée une clé API gratuite sur https://www.last.fm/api/account/create (juste un nom d'app à indiquer).
+2. Ajoute-la dans `.env.local` :
+   ```
+   VITE_LASTFM_API_KEY=<ta_clé>
+   ```
+
+Sans cette clé, les modes "Par genre" et "Par trimestre et genre" ne fonctionneront pas ; "Par trimestre" reste utilisable normalement.
+
+Les genres récupérés sont mis en cache dans le `localStorage` du navigateur (par nom d'artiste), pour éviter de refaire un appel Last.fm à chaque session pour un artiste déjà interrogé.
+
 ## Installation
 
 ```sh
@@ -27,7 +41,7 @@ npm install
 npm run dev
 ```
 
-Ouvre `http://127.0.0.1:5173` (et non `localhost`, pour matcher la Redirect URI déclarée côté Spotify), clique sur "Se connecter à Spotify", regroupe tes titres likés par mois, sélectionne les mois voulus puis crée les playlists.
+Ouvre `http://127.0.0.1:5173` (et non `localhost`, pour matcher la Redirect URI déclarée côté Spotify), clique sur "Se connecter à Spotify", choisis un mode de regroupement (trimestre, genre, ou les deux), ajuste le nom des playlists et les titres à exclure si besoin, puis crée les playlists sélectionnées.
 
 **Note** : l'access token n'est jamais persisté (ni disque, ni storage) — il vit uniquement en mémoire le temps de la session. Un rechargement de page nécessite de se reconnecter.
 

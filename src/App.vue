@@ -4,14 +4,23 @@ import { useAuthStore } from '@/stores/auth'
 import { useLikesStore } from '@/stores/likes'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { TokenExpiredError } from '@/utils/errors'
+import AppHeader from '@/components/AppHeader.vue'
 import LoginScreen from '@/components/LoginScreen.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PreviewScreen from '@/components/PreviewScreen.vue'
 import ConfirmationScreen from '@/components/ConfirmationScreen.vue'
 import ErrorScreen from '@/components/ErrorScreen.vue'
+import type { GroupingMode } from '@/types/spotify'
 
 type AppScreen =
-  'login' | 'processing-callback' | 'loading-likes' | 'preview' | 'creating' | 'done' | 'error'
+  | 'login'
+  | 'processing-callback'
+  | 'loading-likes'
+  | 'loading-genres'
+  | 'preview'
+  | 'creating'
+  | 'done'
+  | 'error'
 
 const authStore = useAuthStore()
 const likesStore = useLikesStore()
@@ -21,6 +30,7 @@ const screen = ref<AppScreen>('login')
 const errorMessage = ref('')
 
 function errorToMessage(error: unknown): string {
+  console.error(error)
   if (error instanceof TokenExpiredError) {
     return 'Ta session a expiré, reconnecte-toi.'
   }
@@ -69,8 +79,15 @@ async function onLogin(): Promise<void> {
   await authStore.login()
 }
 
-function onToggleMonth(monthKey: string): void {
-  playlistsStore.toggleMonth(monthKey)
+async function onChangeMode(mode: GroupingMode): Promise<void> {
+  screen.value = 'loading-genres'
+  try {
+    await likesStore.setGroupingMode(mode)
+    screen.value = 'preview'
+  } catch (error) {
+    errorMessage.value = errorToMessage(error)
+    screen.value = 'error'
+  }
 }
 
 async function onCreate(): Promise<void> {
@@ -93,17 +110,17 @@ function onRetry(): void {
 
 <template>
   <main>
+    <AppHeader />
     <LoginScreen v-if="screen === 'login'" @login="onLogin" />
     <LoadingSpinner v-else-if="screen === 'processing-callback'" message="Connexion en cours…" />
     <LoadingSpinner
       v-else-if="screen === 'loading-likes'"
       message="Chargement de tes titres likés…"
     />
+    <LoadingSpinner v-else-if="screen === 'loading-genres'" message="Chargement des genres…" />
     <PreviewScreen
       v-else-if="screen === 'preview'"
-      :month-groups="likesStore.monthGroups"
-      :selected-months="playlistsStore.selectedMonths"
-      @toggle-month="onToggleMonth"
+      @change-mode="onChangeMode"
       @create="onCreate"
     />
     <LoadingSpinner v-else-if="screen === 'creating'" message="Création des playlists…" />

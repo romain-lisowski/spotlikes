@@ -2,12 +2,18 @@ export interface LikedTrack {
   id: string
   name: string
   artist: string
+  artistId: string
+  primaryArtistName: string
   uri: string
   addedAt: string
+  genres: string[]
+  previewUrl: string | null
 }
 
-export interface MonthGroup {
-  monthKey: string
+export type GroupingMode = 'quarter' | 'genre' | 'quarter-genre'
+
+export interface TrackGroup {
+  key: string
   label: string
   tracks: LikedTrack[]
 }
@@ -18,7 +24,7 @@ export interface SpotifyUser {
 }
 
 export interface PlaylistCreationResult {
-  monthKey: string
+  groupKey: string
   playlistName: string
   playlistUrl: string | null
   success: boolean
