@@ -10,7 +10,7 @@ export interface LikedTrack {
   previewUrl: string | null
 }
 
-export type GroupingMode = 'quarter' | 'genre' | 'quarter-genre'
+export type GroupingMode = 'quarter' | 'genre'
 
 export interface TrackGroup {
   key: string

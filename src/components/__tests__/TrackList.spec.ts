@@ -13,7 +13,7 @@ class FakeAudio {
   addEventListener = vi.fn<() => void>()
 }
 
-function track(id: string, previewUrl: string | null): LikedTrack {
+function track(id: string, previewUrl: string | null, genres: string[] = []): LikedTrack {
   return {
     id,
     name: `Track ${id}`,
@@ -23,7 +23,7 @@ function track(id: string, previewUrl: string | null): LikedTrack {
     previewUrl,
     uri: `spotify:track:${id}`,
     addedAt: '2026-09-01T00:00:00Z',
-    genres: ['indie pop'],
+    genres,
   }
 }
 
@@ -38,11 +38,17 @@ beforeEach(() => {
 })
 
 describe('TrackList', () => {
-  it('affiche le titre, l’artiste et les genres', () => {
+  it('affiche le titre et l’artiste', () => {
     const wrapper = mount(TrackList, {
       props: { tracks: [track('1', null)], groupKey: '2026-Q3' },
     })
     expect(wrapper.text()).toContain('Artist — Track 1')
+  })
+
+  it('affiche les genres du titre quand ils sont connus', () => {
+    const wrapper = mount(TrackList, {
+      props: { tracks: [track('1', null, ['indie pop'])], groupKey: '2026-Q3' },
+    })
     expect(wrapper.text()).toContain('indie pop')
   })
 

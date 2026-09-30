@@ -2,18 +2,19 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { fetchAllLikedTracks } from '@/services/spotifyApi'
 import { fetchArtistsGenres } from '@/services/lastfmApi'
-import { groupTracks } from '@/utils/groupTracks'
+import { groupByQuarter } from '@/utils/groupByQuarter'
+import { groupByGenre } from '@/utils/groupByGenre'
 import { useAuthStore } from './auth'
 import type { GroupingMode, LikedTrack } from '@/types/spotify'
-
-const GENRE_DEPENDENT_MODES: GroupingMode[] = ['genre', 'quarter-genre']
 
 export const useLikesStore = defineStore('likes', () => {
   const tracks = ref<LikedTrack[]>([])
   const groupingMode = ref<GroupingMode>('quarter')
   const genresLoaded = ref(false)
 
-  const groups = computed(() => groupTracks(tracks.value, groupingMode.value))
+  const groups = computed(() =>
+    groupingMode.value === 'genre' ? groupByGenre(tracks.value) : groupByQuarter(tracks.value),
+  )
 
   async function fetchAll(): Promise<void> {
     const authStore = useAuthStore()
@@ -42,7 +43,7 @@ export const useLikesStore = defineStore('likes', () => {
   }
 
   async function setGroupingMode(mode: GroupingMode): Promise<void> {
-    if (GENRE_DEPENDENT_MODES.includes(mode)) {
+    if (mode === 'genre') {
       await ensureGenresLoaded()
     }
     groupingMode.value = mode

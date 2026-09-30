@@ -143,11 +143,11 @@ describe('createPlaylist', () => {
       )
     vi.stubGlobal('fetch', fetchMock)
 
-    const playlist = await createPlaylist('token', 'user1', 'Likes — septembre 2026')
+    const playlist = await createPlaylist('token', 'Likes — septembre 2026')
 
     expect(playlist.id).toBe('pl1')
     const [url, init] = fetchMock.mock.calls[0]!
-    expect(url).toBe('https://api.spotify.com/v1/users/user1/playlists')
+    expect(url).toBe('https://api.spotify.com/v1/me/playlists')
     const body = JSON.parse(init!.body as string)
     expect(body).toEqual({ name: 'Likes — septembre 2026', public: false })
   })

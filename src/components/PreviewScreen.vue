@@ -19,7 +19,6 @@ const hasSelection = computed(() => selectionCount.value > 0)
 const MODE_OPTIONS: { value: GroupingMode; label: string }[] = [
   { value: 'quarter', label: 'Par trimestre' },
   { value: 'genre', label: 'Par genre' },
-  { value: 'quarter-genre', label: 'Par trimestre et genre' },
 ]
 </script>
 

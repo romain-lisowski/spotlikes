@@ -8,8 +8,7 @@ import type { LikedTrack } from '@/types/spotify'
 import type { SpotifyPlaylistObject } from '@/types/spotify-api'
 
 vi.mock('@/services/spotifyApi', () => ({
-  createPlaylist:
-    vi.fn<(accessToken: string, userId: string, name: string) => Promise<SpotifyPlaylistObject>>(),
+  createPlaylist: vi.fn<(accessToken: string, name: string) => Promise<SpotifyPlaylistObject>>(),
   addTracksToPlaylist:
     vi.fn<(accessToken: string, playlistId: string, uris: string[]) => Promise<void>>(),
   uploadPlaylistCoverImage:
@@ -51,6 +50,10 @@ function likedTrack(id: string, addedAt: string): LikedTrack {
   }
 }
 
+function manyTracks(count: number, addedAt: string): LikedTrack[] {
+  return Array.from({ length: count }, (_, index) => likedTrack(`${addedAt}-${index}`, addedAt))
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
@@ -60,40 +63,68 @@ beforeEach(() => {
 
   useAuthStore().accessToken = 'token'
   useAuthStore().user = { id: 'user1', displayName: 'Rom' }
+  // Deux petits groupes (1 titre chacun) : sous le seuil de sélection par
+  // défaut (20), donc non sélectionnés automatiquement — pratique pour la
+  // plupart des tests, qui sélectionnent explicitement ce qu'ils testent.
   useLikesStore().tracks = [
     likedTrack('1', '2026-09-01T00:00:00Z'),
     likedTrack('2', '2026-04-01T00:00:00Z'),
   ]
 })
 
-describe('usePlaylistsStore', () => {
-  it('sélectionne tous les groupes par défaut', () => {
+describe('sélection par défaut', () => {
+  it('ne sélectionne pas les groupes de 20 titres ou moins', () => {
     const store = usePlaylistsStore()
-    expect(store.selectedGroups).toEqual(new Set(['2026-Q3', '2026-Q2']))
+    expect(store.selectedGroups.size).toBe(0)
   })
 
-  it('toggleGroup retire puis rajoute un groupe déjà sélectionné par défaut', () => {
+  it('sélectionne par défaut les groupes de plus de 20 titres', () => {
+    useLikesStore().tracks = manyTracks(21, '2026-09-01T00:00:00Z')
     const store = usePlaylistsStore()
     expect(store.selectedGroups.has('2026-Q3')).toBe(true)
+  })
 
-    store.toggleGroup('2026-Q3')
+  it('ne sélectionne pas un groupe d’exactement 20 titres', () => {
+    useLikesStore().tracks = manyTracks(20, '2026-09-01T00:00:00Z')
+    const store = usePlaylistsStore()
+    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
+  })
+
+  it('ne sélectionne pas un groupe de genre lié à une nationalité, même au-dessus du seuil', async () => {
+    const likesStore = useLikesStore()
+    likesStore.tracks = manyTracks(25, '2026-09-01T00:00:00Z')
+    vi.mocked(fetchArtistsGenres).mockResolvedValue(new Map([['artist-1', ['french pop']]]))
+    const store = usePlaylistsStore()
+    await likesStore.setGroupingMode('genre')
+
+    expect(store.selectedGroups.has('french pop')).toBe(false)
+  })
+})
+
+describe('usePlaylistsStore', () => {
+  it('toggleGroup ajoute puis retire un groupe de la sélection', () => {
+    const store = usePlaylistsStore()
     expect(store.selectedGroups.has('2026-Q3')).toBe(false)
 
     store.toggleGroup('2026-Q3')
     expect(store.selectedGroups.has('2026-Q3')).toBe(true)
+
+    store.toggleGroup('2026-Q3')
+    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
   })
 
-  it('tous les groupes du nouveau mode sont sélectionnés par défaut, et les renommages/exclusions sont réinitialisés', async () => {
+  it('la sélection, les renommages et les exclusions sont réinitialisés quand les likes sont rechargés', async () => {
     const likesStore = useLikesStore()
     const store = usePlaylistsStore()
 
+    store.toggleGroup('2026-Q3')
     store.setPlaylistName('2026-Q3', 'Mon nom perso')
     store.toggleTrackExclusion('2026-Q3', '1')
-
-    await likesStore.setGroupingMode('genre')
-
-    // les 2 titres sont sans genre -> un seul groupe "Genre inconnu", sélectionné par défaut
     expect(store.selectedGroups.size).toBe(1)
+
+    likesStore.tracks = manyTracks(25, '2026-01-01T00:00:00Z')
+
+    expect(store.selectedGroups).toEqual(new Set(['2026-Q1']))
     expect(store.getPlaylistName(Q3_GROUP)).toBe(defaultQ3Name)
     expect(store.isTrackExcluded('2026-Q3', '1')).toBe(false)
   })
@@ -133,10 +164,10 @@ describe('usePlaylistsStore', () => {
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q2') // ne garder que 2026-Q3 sélectionné
+    store.toggleGroup('2026-Q3')
     await store.createSelected()
 
-    expect(createPlaylist).toHaveBeenCalledWith('token', 'user1', defaultQ3Name)
+    expect(createPlaylist).toHaveBeenCalledWith('token', defaultQ3Name)
     expect(addTracksToPlaylist).toHaveBeenCalledWith('token', 'pl-q3', ['spotify:track:1'])
     expect(generateCoverImageBase64).toHaveBeenCalledWith('2026-Q3', defaultQ3Name)
     expect(uploadPlaylistCoverImage).toHaveBeenCalledWith('token', 'pl-q3', 'base64-cover')
@@ -159,7 +190,7 @@ describe('usePlaylistsStore', () => {
     vi.mocked(uploadPlaylistCoverImage).mockRejectedValue(new Error('cover failed'))
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q2')
+    store.toggleGroup('2026-Q3')
     await store.createSelected()
 
     expect(store.results[0]?.success).toBe(true)
@@ -174,7 +205,7 @@ describe('usePlaylistsStore', () => {
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q2')
+    store.toggleGroup('2026-Q3')
     await store.createSelected()
 
     expect(store.isGroupAlreadyCreated('2026-Q3')).toBe(true)
@@ -198,11 +229,11 @@ describe('usePlaylistsStore', () => {
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q2')
+    store.toggleGroup('2026-Q3')
     store.setPlaylistName('2026-Q3', 'Été chill')
     await store.createSelected()
 
-    expect(createPlaylist).toHaveBeenCalledWith('token', 'user1', 'Été chill')
+    expect(createPlaylist).toHaveBeenCalledWith('token', 'Été chill')
   })
 
   it('createSelected exclut les titres décochés de la playlist créée', async () => {
@@ -213,7 +244,7 @@ describe('usePlaylistsStore', () => {
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q2')
+    store.toggleGroup('2026-Q3')
     store.toggleTrackExclusion('2026-Q3', '1')
     await store.createSelected()
 
@@ -230,6 +261,8 @@ describe('usePlaylistsStore', () => {
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
+    store.toggleGroup('2026-Q3')
+    store.toggleGroup('2026-Q2')
     await store.createSelected()
 
     expect(store.results).toHaveLength(2)
@@ -241,6 +274,8 @@ describe('usePlaylistsStore', () => {
     vi.mocked(createPlaylist).mockRejectedValue(new TokenExpiredError())
 
     const store = usePlaylistsStore()
+    store.toggleGroup('2026-Q3')
+    store.toggleGroup('2026-Q2')
 
     await expect(store.createSelected()).rejects.toThrow(TokenExpiredError)
     expect(createPlaylist).toHaveBeenCalledTimes(1)

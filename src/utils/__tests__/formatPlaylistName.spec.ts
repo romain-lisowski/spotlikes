@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatQuarterLabel, formatPlaylistName } from '../formatPlaylistName'
-import { UNKNOWN_GENRE } from '../groupByGenre'
+import { UNKNOWN_GENRE, MERGED_KEY_PREFIX } from '../groupByGenre'
 
 describe('formatQuarterLabel', () => {
   it('formate un trimestre avec l’année', () => {
@@ -13,10 +13,9 @@ describe('formatQuarterLabel', () => {
 })
 
 describe('formatPlaylistName', () => {
-  it('génère un nom en anglais pour un groupe par trimestre, avec la saison et l’année', () => {
-    const name = formatPlaylistName({ key: '2026-Q3' })
-    expect(name).toContain('Summer')
-    expect(name).toContain('2026')
+  it('reprend le libellé du trimestre tel quel', () => {
+    expect(formatPlaylistName({ key: '2026-Q3' })).toBe('T3 2026')
+    expect(formatPlaylistName({ key: '2022-Q1' })).toBe('T1 2022')
   })
 
   it('génère un nom "adjectif + genre" en anglais pour un groupe par genre', () => {
@@ -25,11 +24,8 @@ describe('formatPlaylistName', () => {
     expect(name).not.toBe('Indie Pop')
   })
 
-  it('combine le nom de genre et le nom de trimestre pour un groupe combiné', () => {
-    const name = formatPlaylistName({ key: 'indie pop|2026-Q3' })
-    expect(name).toContain('Indie Pop')
-    expect(name).toContain('Summer')
-    expect(name).toContain('2026')
+  it('génère un nom cohérent pour un groupe de genre fusionné', () => {
+    expect(formatPlaylistName({ key: `${MERGED_KEY_PREFIX}pop` })).toContain('Pop')
   })
 
   it('utilise un nom dédié pour le groupe "Genre inconnu"', () => {
@@ -41,14 +37,12 @@ describe('formatPlaylistName', () => {
     expect(formatPlaylistName(group)).toBe(formatPlaylistName(group))
   })
 
-  it('varie le nom selon le groupe plutôt que d’utiliser toujours le même modèle', () => {
+  it('varie le nom selon le genre plutôt que d’utiliser toujours le même modèle', () => {
     const names = new Set([
-      formatPlaylistName({ key: '2026-Q1' }),
-      formatPlaylistName({ key: '2026-Q2' }),
-      formatPlaylistName({ key: '2026-Q3' }),
-      formatPlaylistName({ key: '2026-Q4' }),
       formatPlaylistName({ key: 'indie pop' }),
       formatPlaylistName({ key: 'classic rock' }),
+      formatPlaylistName({ key: 'jazz' }),
+      formatPlaylistName({ key: 'metal' }),
     ])
     expect(names.size).toBeGreaterThan(1)
   })

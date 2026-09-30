@@ -7,10 +7,20 @@ import {
 } from '@/services/spotifyApi'
 import { formatPlaylistName } from '@/utils/formatPlaylistName'
 import { generateCoverImageBase64 } from '@/utils/generateCoverImage'
+import { genreKeyOf, isNationalityGenre } from '@/utils/groupByGenre'
 import { TokenExpiredError } from '@/utils/errors'
 import { useAuthStore } from './auth'
 import { useLikesStore } from './likes'
 import type { PlaylistCreationResult, TrackGroup } from '@/types/spotify'
+
+const DEFAULT_SELECTION_MIN_TRACKS = 20
+const QUARTER_KEY_PATTERN = /^\d{4}-Q[1-4]$/
+
+function isSelectableByDefault(group: TrackGroup): boolean {
+  if (group.tracks.length <= DEFAULT_SELECTION_MIN_TRACKS) return false
+  if (QUARTER_KEY_PATTERN.test(group.key)) return true
+  return !isNationalityGenre(genreKeyOf(group.key))
+}
 
 export const usePlaylistsStore = defineStore('playlists', () => {
   const selectedGroups = ref<Set<string>>(new Set())
@@ -21,14 +31,16 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   const likesStore = useLikesStore()
 
-  // À chaque (re)chargement des groupes (premier chargement des likes, ou
-  // changement de mode), on sélectionne tout par défaut — sauf ce qui a déjà
-  // été créé dans cette session — et on repart d'un nommage/exclusions propres.
+  // Au chargement des likes, on sélectionne par défaut les groupes de plus de
+  // 20 titres qui ne sont pas déjà créés — et on repart d'un nommage/exclusions
+  // propres.
   watch(
     () => likesStore.groups,
     (groups) => {
       selectedGroups.value = new Set(
-        groups.filter((group) => !createdGroupKeys.value.has(group.key)).map((group) => group.key),
+        groups
+          .filter((group) => !createdGroupKeys.value.has(group.key) && isSelectableByDefault(group))
+          .map((group) => group.key),
       )
       nameOverrides.value.clear()
       excludedTracks.value.clear()
@@ -77,12 +89,11 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   async function createSelected(): Promise<void> {
     const authStore = useAuthStore()
-    if (!authStore.accessToken || !authStore.user) {
+    if (!authStore.accessToken) {
       throw new Error('Utilisateur non authentifié')
     }
 
     const accessToken = authStore.accessToken
-    const userId = authStore.user.id
     const groupsToCreate = likesStore.groups.filter(
       (group) => selectedGroups.value.has(group.key) && !isGroupAlreadyCreated(group.key),
     )
@@ -93,7 +104,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
       const playlistName = getPlaylistName(group)
       const tracksToAdd = group.tracks.filter((track) => !isTrackExcluded(group.key, track.id))
       try {
-        const playlist = await createPlaylist(accessToken, userId, playlistName)
+        const playlist = await createPlaylist(accessToken, playlistName)
         await addTracksToPlaylist(
           accessToken,
           playlist.id,

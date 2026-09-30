@@ -81,18 +81,13 @@ export async function fetchAllLikedTracks(accessToken: string): Promise<LikedTra
 
 export async function createPlaylist(
   accessToken: string,
-  userId: string,
   name: string,
 ): Promise<SpotifyPlaylistObject> {
-  const response = await spotifyFetch(
-    accessToken,
-    `${SPOTIFY_API_BASE_URL}/users/${userId}/playlists`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, public: false }),
-    },
-  )
+  const response = await spotifyFetch(accessToken, `${SPOTIFY_API_BASE_URL}/me/playlists`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, public: false }),
+  })
   return response.json()
 }
 
@@ -102,7 +97,7 @@ export async function addTracksToPlaylist(
   uris: string[],
 ): Promise<void> {
   for (const batch of chunkArray(uris, MAX_URIS_PER_REQUEST)) {
-    await spotifyFetch(accessToken, `${SPOTIFY_API_BASE_URL}/playlists/${playlistId}/tracks`, {
+    await spotifyFetch(accessToken, `${SPOTIFY_API_BASE_URL}/playlists/${playlistId}/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uris: batch }),

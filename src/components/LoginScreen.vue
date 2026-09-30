@@ -7,7 +7,7 @@ const FEATURES = [
   {
     icon: '🗂️',
     title: 'Trimestre ou genre',
-    text: 'Choisis comment regrouper tes titres likés, ou combine les deux.',
+    text: 'Choisis comment regrouper tes titres likés.',
   },
   {
     icon: '✏️',

@@ -50,14 +50,13 @@ describe('useLikesStore', () => {
     await store.fetchAll()
 
     expect(store.tracks).toHaveLength(1)
-    expect(store.tracks[0]?.genres).toEqual([])
     expect(fetchArtistsGenres).not.toHaveBeenCalled()
 
     expect(store.groups).toHaveLength(1)
     expect(store.groups[0]?.key).toBe('2026-Q3')
   })
 
-  it('setGroupingMode vers un mode genre déclenche l’enrichissement des genres, une seule fois', async () => {
+  it('setGroupingMode vers "genre" déclenche l’enrichissement des genres, une seule fois', async () => {
     useAuthStore().accessToken = 'token'
     vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
     vi.mocked(fetchArtistsGenres).mockResolvedValue(new Map([['artist-1', ['indie pop']]]))
@@ -69,11 +68,12 @@ describe('useLikesStore', () => {
     expect(store.groups[0]?.key).toBe('indie pop')
     expect(fetchArtistsGenres).toHaveBeenCalledWith([{ id: 'artist-1', name: 'A' }])
 
-    await store.setGroupingMode('quarter-genre')
+    await store.setGroupingMode('quarter')
+    await store.setGroupingMode('genre')
     expect(fetchArtistsGenres).toHaveBeenCalledTimes(1)
   })
 
-  it('setGroupingMode vers un mode temporel n’appelle pas les genres', async () => {
+  it('setGroupingMode vers "quarter" n’appelle pas les genres', async () => {
     useAuthStore().accessToken = 'token'
     vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
 
