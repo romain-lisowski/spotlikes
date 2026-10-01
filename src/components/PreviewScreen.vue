@@ -16,8 +16,27 @@ const playlistsStore = usePlaylistsStore()
 const selectionCount = computed(() => playlistsStore.selectedGroups.size)
 const hasSelection = computed(() => selectionCount.value > 0)
 
+const selectableGroupKeys = computed(() =>
+  likesStore.groups
+    .filter((group) => !playlistsStore.isGroupAlreadyCreated(group.key))
+    .map((group) => group.key),
+)
+const allSelected = computed(
+  () =>
+    selectableGroupKeys.value.length > 0 &&
+    selectableGroupKeys.value.every((key) => playlistsStore.selectedGroups.has(key)),
+)
+
+function onToggleAll(): void {
+  if (allSelected.value) {
+    playlistsStore.deselectAll()
+  } else {
+    playlistsStore.selectAll(selectableGroupKeys.value)
+  }
+}
+
 const MODE_OPTIONS: { value: GroupingMode; label: string }[] = [
-  { value: 'quarter', label: 'Par trimestre' },
+  { value: 'year', label: 'Par année' },
   { value: 'genre', label: 'Par genre' },
 ]
 </script>
@@ -49,6 +68,14 @@ const MODE_OPTIONS: { value: GroupingMode; label: string }[] = [
         <span>{{ option.label }}</span>
       </label>
     </div>
+    <button
+      type="button"
+      class="toggle-all"
+      :disabled="selectableGroupKeys.length === 0"
+      @click="onToggleAll"
+    >
+      {{ allSelected ? 'Tout désélectionner' : 'Tout sélectionner' }}
+    </button>
     <ul class="group-list">
       <GroupItem v-for="group in likesStore.groups" :key="group.key" :group="group" />
     </ul>
@@ -121,6 +148,19 @@ const MODE_OPTIONS: { value: GroupingMode; label: string }[] = [
 .mode-option input:focus-visible + span {
   outline: 2px solid hsla(160, 100%, 37%, 1);
   outline-offset: 2px;
+}
+
+.toggle-all {
+  background: none;
+  color: hsla(160, 100%, 37%, 1);
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.toggle-all:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
 }
 
 .group-list {

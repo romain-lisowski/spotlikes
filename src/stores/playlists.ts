@@ -7,19 +7,16 @@ import {
 } from '@/services/spotifyApi'
 import { formatPlaylistName } from '@/utils/formatPlaylistName'
 import { generateCoverImageBase64 } from '@/utils/generateCoverImage'
-import { genreKeyOf, isNationalityGenre } from '@/utils/groupByGenre'
+import { YEAR_KEY_PATTERN } from '@/utils/groupByYear'
 import { TokenExpiredError } from '@/utils/errors'
 import { useAuthStore } from './auth'
 import { useLikesStore } from './likes'
 import type { PlaylistCreationResult, TrackGroup } from '@/types/spotify'
 
 const DEFAULT_SELECTION_MIN_TRACKS = 20
-const QUARTER_KEY_PATTERN = /^\d{4}-Q[1-4]$/
 
 function isSelectableByDefault(group: TrackGroup): boolean {
-  if (group.tracks.length <= DEFAULT_SELECTION_MIN_TRACKS) return false
-  if (QUARTER_KEY_PATTERN.test(group.key)) return true
-  return !isNationalityGenre(genreKeyOf(group.key))
+  return group.tracks.length > DEFAULT_SELECTION_MIN_TRACKS
 }
 
 export const usePlaylistsStore = defineStore('playlists', () => {
@@ -59,6 +56,14 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     } else {
       selectedGroups.value.add(groupKey)
     }
+  }
+
+  function selectAll(groupKeys: string[]): void {
+    selectedGroups.value = new Set(groupKeys.filter((key) => !isGroupAlreadyCreated(key)))
+  }
+
+  function deselectAll(): void {
+    selectedGroups.value.clear()
   }
 
   function getPlaylistName(group: TrackGroup): string {
@@ -111,7 +116,8 @@ export const usePlaylistsStore = defineStore('playlists', () => {
           tracksToAdd.map((track) => track.uri),
         )
         try {
-          const coverImage = generateCoverImageBase64(group.key, playlistName)
+          const coverKind = YEAR_KEY_PATTERN.test(group.key) ? 'year' : 'genre'
+          const coverImage = generateCoverImageBase64(group.key, playlistName, coverKind)
           await uploadPlaylistCoverImage(accessToken, playlist.id, coverImage)
         } catch (coverError) {
           if (coverError instanceof TokenExpiredError) {
@@ -148,6 +154,8 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     results,
     isGroupAlreadyCreated,
     toggleGroup,
+    selectAll,
+    deselectAll,
     getPlaylistName,
     setPlaylistName,
     isTrackExcluded,

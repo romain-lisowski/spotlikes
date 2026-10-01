@@ -42,7 +42,7 @@ describe('useLikesStore', () => {
     await expect(store.fetchAll()).rejects.toThrow('Utilisateur non authentifié')
   })
 
-  it('fetchAll récupère les titres et les expose regroupés par trimestre, sans appeler les genres', async () => {
+  it('fetchAll récupère les titres et les expose regroupés par année, sans appeler les genres', async () => {
     useAuthStore().accessToken = 'token'
     vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
 
@@ -53,7 +53,7 @@ describe('useLikesStore', () => {
     expect(fetchArtistsGenres).not.toHaveBeenCalled()
 
     expect(store.groups).toHaveLength(1)
-    expect(store.groups[0]?.key).toBe('2026-Q3')
+    expect(store.groups[0]?.key).toBe('2026')
   })
 
   it('setGroupingMode vers "genre" déclenche l’enrichissement des genres, une seule fois', async () => {
@@ -65,21 +65,21 @@ describe('useLikesStore', () => {
     await store.fetchAll()
     await store.setGroupingMode('genre')
 
-    expect(store.groups[0]?.key).toBe('indie pop')
+    expect(store.groups[0]?.key).toBe('Autres')
     expect(fetchArtistsGenres).toHaveBeenCalledWith([{ id: 'artist-1', name: 'A' }])
 
-    await store.setGroupingMode('quarter')
+    await store.setGroupingMode('year')
     await store.setGroupingMode('genre')
     expect(fetchArtistsGenres).toHaveBeenCalledTimes(1)
   })
 
-  it('setGroupingMode vers "quarter" n’appelle pas les genres', async () => {
+  it('setGroupingMode vers "year" n’appelle pas les genres', async () => {
     useAuthStore().accessToken = 'token'
     vi.mocked(fetchAllLikedTracks).mockResolvedValue([likedTrack('1', '2026-09-01T00:00:00Z')])
 
     const store = useLikesStore()
     await store.fetchAll()
-    await store.setGroupingMode('quarter')
+    await store.setGroupingMode('year')
 
     expect(fetchArtistsGenres).not.toHaveBeenCalled()
   })

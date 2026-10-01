@@ -1,65 +1,9 @@
 import type { LikedTrack, TrackGroup } from '@/types/spotify'
 
 export const UNKNOWN_GENRE = 'Genre inconnu'
+export const FALLBACK_FAMILY = 'Autres'
+export const SMALL_FAMILY_TRACK_THRESHOLD = 20
 
-// En dessous de ce nombre de titres, un groupe est considéré "petit" : non
-// sélectionné par défaut, et fusionnable avec d'autres petits groupes proches.
-export const SMALL_GROUP_TRACK_THRESHOLD = 20
-
-// Préfixe distinctif pour les clés de groupes fusionnés, afin de ne jamais
-// entrer en collision avec un vrai tag Last.fm (toujours lettres/espaces après
-// normalisation).
-export const MERGED_KEY_PREFIX = 'merged:'
-
-// Tags décrivant une nationalité/un pays plutôt qu'un style musical en soi
-// (ex: "french", "italian"). Vérifié par mot entier, pas en sous-chaîne, pour
-// éviter les faux positifs (ex: ne matche pas "uk garage").
-const NATIONALITY_WORDS = [
-  'french',
-  'italian',
-  'italy',
-  'german',
-  'germany',
-  'spanish',
-  'spain',
-  'british',
-  'english',
-  'american',
-  'brazilian',
-  'brazil',
-  'japanese',
-  'korean',
-  'chinese',
-  'russian',
-  'dutch',
-  'swedish',
-  'norwegian',
-  'danish',
-  'finnish',
-  'polish',
-  'irish',
-  'scottish',
-  'welsh',
-  'australian',
-  'canadian',
-  'mexican',
-  'indian',
-  'african',
-  'greek',
-  'turkish',
-  'portuguese',
-  'belgian',
-  'swiss',
-  'austrian',
-  'icelandic',
-  'argentine',
-  'colombian',
-  'cuban',
-]
-
-// Fusionne les variantes d'écriture d'un même tag ("Hip-Hop", "HipHop", "hip hop")
-// vers une seule forme canonique, utilisée à la fois comme clé de regroupement et
-// comme base d'affichage.
 export function normalizeGenreKey(genre: string): string {
   return genre
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -69,31 +13,76 @@ export function normalizeGenreKey(genre: string): string {
     .trim()
 }
 
-export function formatGenreLabel(genre: string): string {
-  return genre.replace(/\b\w/g, (char) => char.toUpperCase())
+// Tags "indie" traités à part : le style réel derrière varie trop (indie
+// pop/rock/folk vs indie electronic/dance) pour un simple mot-clé générique.
+const INDIE_ELECTRO_KEYWORDS = ['electronic', 'electro', 'dance', 'techno', 'house', 'edm', 'synth']
+
+// Grandes familles de genres. Ordre important : les mots-clés les plus
+// spécifiques sont vérifiés avant les plus génériques.
+const GENRE_FAMILIES: { family: string; keywords: string[] }[] = [
+  { family: 'Hip-Hop', keywords: ['hip hop', 'rap', 'trap', 'grime', 'drill'] },
+  { family: 'Punk', keywords: ['punk'] },
+  { family: 'Metal', keywords: ['metal', 'hardcore', 'grindcore', 'deathcore'] },
+  {
+    family: 'Electro',
+    keywords: [
+      'techno',
+      'electronic',
+      'electro',
+      'drum and bass',
+      'dnb',
+      'jungle',
+      'house',
+      'dubstep',
+      'uk garage',
+      'garage',
+      'psytrance',
+      'trance',
+      'edm',
+      'idm',
+      'synthwave',
+    ],
+  },
+  {
+    family: 'Chill',
+    keywords: ['ambient', 'downtempo', 'chillwave', 'chillout', 'chill', 'trip hop', 'lounge'],
+  },
+  { family: 'Rock', keywords: ['rock', 'grunge', 'alternative', 'emo', 'folk'] },
+  { family: 'Disco', keywords: ['disco'] },
+  { family: 'Soul', keywords: ['soul', 'funk', 'r&b', 'rnb', 'motown'] },
+  { family: 'Blues', keywords: ['blues'] },
+  { family: 'Jazz', keywords: ['jazz'] },
+  { family: 'Classique', keywords: ['classical', 'orchestra', 'opera', 'baroque'] },
+  { family: 'Country', keywords: ['country', 'bluegrass', 'americana', 'singer-songwriter'] },
+  { family: 'Latin', keywords: ['latin', 'reggaeton', 'salsa', 'bachata', 'cumbia'] },
+  { family: 'Reggae', keywords: ['reggae', 'ska', 'dancehall'] },
+  { family: 'Pop', keywords: ['pop', 'k-pop', 'kpop'] },
+  {
+    family: 'World',
+    keywords: ['world', 'afrobeat', 'afrobeats', 'amapiano', 'bollywood', 'bhangra', 'soca', 'highlife'],
+  },
+]
+
+// Familles qui rejoignent une famille précise (plutôt que le fourre-tout
+// "Autres") quand elles n'atteignent pas le seuil.
+const MERGE_TARGET_BY_FAMILY: Record<string, string> = {
+  Punk: 'Rock',
+}
+
+export function mapGenreToFamily(genre: string): string {
+  const normalized = normalizeGenreKey(genre)
+
+  if (normalized.includes('indie')) {
+    return INDIE_ELECTRO_KEYWORDS.some((k) => normalized.includes(k)) ? 'Electro' : 'Rock'
+  }
+
+  const match = GENRE_FAMILIES.find(({ keywords }) => keywords.some((k) => normalized.includes(k)))
+  return match?.family ?? FALLBACK_FAMILY
 }
 
 export function primaryGenreOf(track: LikedTrack): string {
-  return track.genres[0] ?? UNKNOWN_GENRE
-}
-
-export function isNationalityGenre(genreKey: string): boolean {
-  return NATIONALITY_WORDS.some((word) => new RegExp(`\\b${word}\\b`).test(genreKey))
-}
-
-// Heuristique mécanique (pas de jugement de ma part) : deux tags qui se
-// terminent par le même mot ("indie pop" / "dream pop" / "chamber pop") sont
-// considérés proches. Last.fm n'a pas de vraie donnée de similarité utilisable
-// (tag.getSimilar renvoie systématiquement vide).
-export function lastWordOf(genreKey: string): string {
-  const words = genreKey.trim().split(' ')
-  return words[words.length - 1]!
-}
-
-export function genreKeyOf(groupKey: string): string {
-  return groupKey.startsWith(MERGED_KEY_PREFIX)
-    ? groupKey.slice(MERGED_KEY_PREFIX.length)
-    : groupKey
+  const rawGenre = track.genres[0]
+  return rawGenre ? mapGenreToFamily(rawGenre) : UNKNOWN_GENRE
 }
 
 function sortByGenre(a: TrackGroup, b: TrackGroup): number {
@@ -102,71 +91,58 @@ function sortByGenre(a: TrackGroup, b: TrackGroup): number {
   return b.tracks.length - a.tracks.length || a.key.localeCompare(b.key)
 }
 
-// Regroupe les groupes dont clusterKeyOf renvoie la même valeur (null = garder
-// tel quel, jamais fusionné). Un cluster d'un seul membre reste inchangé.
-export function mergeSmallGroups<T extends TrackGroup>(
-  groups: T[],
-  clusterKeyOf: (group: T) => string | null,
-  buildMerged: (clusterKey: string, members: T[]) => TrackGroup,
-): TrackGroup[] {
-  const untouched: TrackGroup[] = []
-  const clusters = new Map<string, T[]>()
+function mergeInto(
+  tracksByFamily: Map<string, LikedTrack[]>,
+  fromFamily: string,
+  toFamily: string,
+): void {
+  const fromTracks = tracksByFamily.get(fromFamily)
+  if (!fromTracks) return
 
-  for (const group of groups) {
-    const clusterKey = clusterKeyOf(group)
-    if (clusterKey === null) {
-      untouched.push(group)
-      continue
-    }
-    const cluster = clusters.get(clusterKey)
-    if (cluster) {
-      cluster.push(group)
-    } else {
-      clusters.set(clusterKey, [group])
+  const toTracks = tracksByFamily.get(toFamily)
+  if (toTracks) {
+    toTracks.push(...fromTracks)
+  } else {
+    tracksByFamily.set(toFamily, fromTracks)
+  }
+  tracksByFamily.delete(fromFamily)
+}
+
+// Une famille trop petite est fusionnée avec une autre plutôt que de rester
+// une catégorie isolée : d'abord vers sa famille dédiée si elle en a une
+// (ex. Punk -> Rock), sinon vers le fourre-tout "Autres".
+function mergeSmallFamilies(tracksByFamily: Map<string, LikedTrack[]>): void {
+  for (const family of Object.keys(MERGE_TARGET_BY_FAMILY)) {
+    const tracks = tracksByFamily.get(family)
+    if (tracks && tracks.length < SMALL_FAMILY_TRACK_THRESHOLD) {
+      mergeInto(tracksByFamily, family, MERGE_TARGET_BY_FAMILY[family]!)
     }
   }
 
-  const merged: TrackGroup[] = []
-  for (const [clusterKey, members] of clusters) {
-    merged.push(members.length === 1 ? members[0]! : buildMerged(clusterKey, members))
+  for (const [family, tracks] of tracksByFamily) {
+    if (family === UNKNOWN_GENRE || family === FALLBACK_FAMILY) continue
+    if (tracks.length < SMALL_FAMILY_TRACK_THRESHOLD) {
+      mergeInto(tracksByFamily, family, FALLBACK_FAMILY)
+    }
   }
-
-  return [...untouched, ...merged]
 }
 
 export function groupByGenre(tracks: LikedTrack[]): TrackGroup[] {
-  const tracksByGenre = new Map<string, LikedTrack[]>()
+  const tracksByFamily = new Map<string, LikedTrack[]>()
 
   for (const track of tracks) {
-    const genre = primaryGenreOf(track)
-    const genreTracks = tracksByGenre.get(genre)
-    if (genreTracks) {
-      genreTracks.push(track)
+    const family = primaryGenreOf(track)
+    const familyTracks = tracksByFamily.get(family)
+    if (familyTracks) {
+      familyTracks.push(track)
     } else {
-      tracksByGenre.set(genre, [track])
+      tracksByFamily.set(family, [track])
     }
   }
 
-  const groups = Array.from(tracksByGenre.entries()).map(([key, genreTracks]) => ({
-    key,
-    label: key === UNKNOWN_GENRE ? key : formatGenreLabel(key),
-    tracks: genreTracks,
-  }))
+  mergeSmallFamilies(tracksByFamily)
 
-  const merged = mergeSmallGroups(
-    groups,
-    (group) => {
-      if (group.key === UNKNOWN_GENRE || group.tracks.length >= SMALL_GROUP_TRACK_THRESHOLD) {
-        return null
-      }
-      return lastWordOf(group.key)
-    },
-    (word, members) => ({
-      key: `${MERGED_KEY_PREFIX}${word}`,
-      label: `${formatGenreLabel(word)} (mix)`,
-      tracks: members.flatMap((member) => member.tracks),
-    }),
-  )
-
-  return merged.sort(sortByGenre)
+  return Array.from(tracksByFamily.entries())
+    .map(([key, familyTracks]) => ({ key, label: key, tracks: familyTracks }))
+    .sort(sortByGenre)
 }

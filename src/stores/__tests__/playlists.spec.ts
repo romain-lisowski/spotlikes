@@ -21,7 +21,8 @@ vi.mock('@/services/lastfmApi', () => ({
 }))
 
 vi.mock('@/utils/generateCoverImage', () => ({
-  generateCoverImageBase64: vi.fn<(seed: string, title: string) => string>(),
+  generateCoverImageBase64:
+    vi.fn<(seed: string, title: string, kind: 'genre' | 'year') => string>(),
 }))
 
 import {
@@ -33,8 +34,8 @@ import { fetchArtistsGenres } from '@/services/lastfmApi'
 import { generateCoverImageBase64 } from '@/utils/generateCoverImage'
 import { formatPlaylistName } from '@/utils/formatPlaylistName'
 
-const Q3_GROUP = { key: '2026-Q3', label: 'T3 2026', tracks: [] }
-const defaultQ3Name = formatPlaylistName(Q3_GROUP)
+const Y2026_GROUP = { key: '2026', label: '2026', tracks: [] }
+const defaultY2026Name = formatPlaylistName(Y2026_GROUP)
 
 function likedTrack(id: string, addedAt: string): LikedTrack {
   return {
@@ -63,12 +64,13 @@ beforeEach(() => {
 
   useAuthStore().accessToken = 'token'
   useAuthStore().user = { id: 'user1', displayName: 'Rom' }
-  // Deux petits groupes (1 titre chacun) : sous le seuil de sélection par
-  // défaut (20), donc non sélectionnés automatiquement — pratique pour la
-  // plupart des tests, qui sélectionnent explicitement ce qu'ils testent.
+  // Deux petits groupes (1 titre chacun, années différentes) : sous le seuil
+  // de sélection par défaut (20), donc non sélectionnés automatiquement —
+  // pratique pour la plupart des tests, qui sélectionnent explicitement ce
+  // qu'ils testent.
   useLikesStore().tracks = [
     likedTrack('1', '2026-09-01T00:00:00Z'),
-    likedTrack('2', '2026-04-01T00:00:00Z'),
+    likedTrack('2', '2025-04-01T00:00:00Z'),
   ]
 })
 
@@ -81,156 +83,192 @@ describe('sélection par défaut', () => {
   it('sélectionne par défaut les groupes de plus de 20 titres', () => {
     useLikesStore().tracks = manyTracks(21, '2026-09-01T00:00:00Z')
     const store = usePlaylistsStore()
-    expect(store.selectedGroups.has('2026-Q3')).toBe(true)
+    expect(store.selectedGroups.has('2026')).toBe(true)
   })
 
   it('ne sélectionne pas un groupe d’exactement 20 titres', () => {
     useLikesStore().tracks = manyTracks(20, '2026-09-01T00:00:00Z')
     const store = usePlaylistsStore()
-    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
+    expect(store.selectedGroups.has('2026')).toBe(false)
+  })
+})
+
+describe('selectAll / deselectAll', () => {
+  it('selectAll sélectionne les groupes donnés, sauf ceux déjà créés', async () => {
+    vi.mocked(createPlaylist).mockResolvedValue({
+      id: 'pl-2026',
+      external_urls: { spotify: 'https://open.spotify.com/pl-2026' },
+    })
+    vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
+
+    const store = usePlaylistsStore()
+    store.toggleGroup('2026')
+    await store.createSelected()
+
+    store.selectAll(['2026', '2025'])
+
+    expect(store.selectedGroups).toEqual(new Set(['2025']))
   })
 
-  it('ne sélectionne pas un groupe de genre lié à une nationalité, même au-dessus du seuil', async () => {
-    const likesStore = useLikesStore()
-    likesStore.tracks = manyTracks(25, '2026-09-01T00:00:00Z')
-    vi.mocked(fetchArtistsGenres).mockResolvedValue(new Map([['artist-1', ['french pop']]]))
+  it('deselectAll vide la sélection', () => {
     const store = usePlaylistsStore()
-    await likesStore.setGroupingMode('genre')
+    store.toggleGroup('2026')
+    store.toggleGroup('2025')
 
-    expect(store.selectedGroups.has('french pop')).toBe(false)
+    store.deselectAll()
+
+    expect(store.selectedGroups.size).toBe(0)
   })
 })
 
 describe('usePlaylistsStore', () => {
   it('toggleGroup ajoute puis retire un groupe de la sélection', () => {
     const store = usePlaylistsStore()
-    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
+    expect(store.selectedGroups.has('2026')).toBe(false)
 
-    store.toggleGroup('2026-Q3')
-    expect(store.selectedGroups.has('2026-Q3')).toBe(true)
+    store.toggleGroup('2026')
+    expect(store.selectedGroups.has('2026')).toBe(true)
 
-    store.toggleGroup('2026-Q3')
-    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
+    store.toggleGroup('2026')
+    expect(store.selectedGroups.has('2026')).toBe(false)
   })
 
   it('la sélection, les renommages et les exclusions sont réinitialisés quand les likes sont rechargés', async () => {
     const likesStore = useLikesStore()
     const store = usePlaylistsStore()
 
-    store.toggleGroup('2026-Q3')
-    store.setPlaylistName('2026-Q3', 'Mon nom perso')
-    store.toggleTrackExclusion('2026-Q3', '1')
+    store.toggleGroup('2026')
+    store.setPlaylistName('2026', 'Mon nom perso')
+    store.toggleTrackExclusion('2026', '1')
     expect(store.selectedGroups.size).toBe(1)
 
-    likesStore.tracks = manyTracks(25, '2026-01-01T00:00:00Z')
+    likesStore.tracks = manyTracks(25, '2030-01-01T00:00:00Z')
 
-    expect(store.selectedGroups).toEqual(new Set(['2026-Q1']))
-    expect(store.getPlaylistName(Q3_GROUP)).toBe(defaultQ3Name)
-    expect(store.isTrackExcluded('2026-Q3', '1')).toBe(false)
+    expect(store.selectedGroups).toEqual(new Set(['2030']))
+    expect(store.getPlaylistName(Y2026_GROUP)).toBe(defaultY2026Name)
+    expect(store.isTrackExcluded('2026', '1')).toBe(false)
   })
 
   it('getPlaylistName retourne le nom par défaut tant qu’aucun renommage n’a été fait', () => {
     const store = usePlaylistsStore()
-    expect(store.getPlaylistName(Q3_GROUP)).toBe(defaultQ3Name)
+    expect(store.getPlaylistName(Y2026_GROUP)).toBe(defaultY2026Name)
   })
 
   it('setPlaylistName permet de personnaliser le nom, et un nom vide restaure le nom par défaut', () => {
     const store = usePlaylistsStore()
 
-    store.setPlaylistName('2026-Q3', 'Été chill')
-    expect(store.getPlaylistName(Q3_GROUP)).toBe('Été chill')
+    store.setPlaylistName('2026', 'Été chill')
+    expect(store.getPlaylistName(Y2026_GROUP)).toBe('Été chill')
 
-    store.setPlaylistName('2026-Q3', '   ')
-    expect(store.getPlaylistName(Q3_GROUP)).toBe(defaultQ3Name)
+    store.setPlaylistName('2026', '   ')
+    expect(store.getPlaylistName(Y2026_GROUP)).toBe(defaultY2026Name)
   })
 
   it('toggleTrackExclusion bascule l’exclusion d’un titre pour un groupe donné', () => {
     const store = usePlaylistsStore()
 
-    expect(store.isTrackExcluded('2026-Q3', '1')).toBe(false)
+    expect(store.isTrackExcluded('2026', '1')).toBe(false)
 
-    store.toggleTrackExclusion('2026-Q3', '1')
-    expect(store.isTrackExcluded('2026-Q3', '1')).toBe(true)
+    store.toggleTrackExclusion('2026', '1')
+    expect(store.isTrackExcluded('2026', '1')).toBe(true)
 
-    store.toggleTrackExclusion('2026-Q3', '1')
-    expect(store.isTrackExcluded('2026-Q3', '1')).toBe(false)
+    store.toggleTrackExclusion('2026', '1')
+    expect(store.isTrackExcluded('2026', '1')).toBe(false)
   })
 
   it('createSelected crée une playlist par groupe sélectionné et enregistre le résultat', async () => {
     vi.mocked(createPlaylist).mockResolvedValue({
-      id: 'pl-q3',
-      external_urls: { spotify: 'https://open.spotify.com/pl-q3' },
+      id: 'pl-2026',
+      external_urls: { spotify: 'https://open.spotify.com/pl-2026' },
     })
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
+    store.toggleGroup('2026')
     await store.createSelected()
 
-    expect(createPlaylist).toHaveBeenCalledWith('token', defaultQ3Name)
-    expect(addTracksToPlaylist).toHaveBeenCalledWith('token', 'pl-q3', ['spotify:track:1'])
-    expect(generateCoverImageBase64).toHaveBeenCalledWith('2026-Q3', defaultQ3Name)
-    expect(uploadPlaylistCoverImage).toHaveBeenCalledWith('token', 'pl-q3', 'base64-cover')
+    expect(createPlaylist).toHaveBeenCalledWith('token', defaultY2026Name)
+    expect(addTracksToPlaylist).toHaveBeenCalledWith('token', 'pl-2026', ['spotify:track:1'])
+    expect(generateCoverImageBase64).toHaveBeenCalledWith('2026', defaultY2026Name, 'year')
+    expect(uploadPlaylistCoverImage).toHaveBeenCalledWith('token', 'pl-2026', 'base64-cover')
     expect(store.results).toEqual([
       {
-        groupKey: '2026-Q3',
-        playlistName: defaultQ3Name,
-        playlistUrl: 'https://open.spotify.com/pl-q3',
+        groupKey: '2026',
+        playlistName: defaultY2026Name,
+        playlistUrl: 'https://open.spotify.com/pl-2026',
         success: true,
       },
     ])
   })
 
+  it('utilise le type de cover "genre" pour un groupe par genre', async () => {
+    vi.mocked(fetchArtistsGenres).mockResolvedValue(new Map([['artist-1', ['indie pop']]]))
+    const likesStore = useLikesStore()
+    await likesStore.setGroupingMode('genre')
+
+    vi.mocked(createPlaylist).mockResolvedValue({
+      id: 'pl-genre',
+      external_urls: { spotify: 'https://open.spotify.com/pl-genre' },
+    })
+    vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
+
+    const store = usePlaylistsStore()
+    store.toggleGroup('Autres')
+    await store.createSelected()
+
+    expect(generateCoverImageBase64).toHaveBeenCalledWith('Autres', expect.any(String), 'genre')
+  })
+
   it('un échec d’upload de cover n’empêche pas la playlist d’être marquée comme créée', async () => {
     vi.mocked(createPlaylist).mockResolvedValue({
-      id: 'pl-q3',
-      external_urls: { spotify: 'https://open.spotify.com/pl-q3' },
+      id: 'pl-2026',
+      external_urls: { spotify: 'https://open.spotify.com/pl-2026' },
     })
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
     vi.mocked(uploadPlaylistCoverImage).mockRejectedValue(new Error('cover failed'))
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
+    store.toggleGroup('2026')
     await store.createSelected()
 
     expect(store.results[0]?.success).toBe(true)
-    expect(store.isGroupAlreadyCreated('2026-Q3')).toBe(true)
+    expect(store.isGroupAlreadyCreated('2026')).toBe(true)
   })
 
   it('marque le groupe comme déjà créé et empêche une nouvelle création', async () => {
     vi.mocked(createPlaylist).mockResolvedValue({
-      id: 'pl-q3',
-      external_urls: { spotify: 'https://open.spotify.com/pl-q3' },
+      id: 'pl-2026',
+      external_urls: { spotify: 'https://open.spotify.com/pl-2026' },
     })
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
+    store.toggleGroup('2026')
     await store.createSelected()
 
-    expect(store.isGroupAlreadyCreated('2026-Q3')).toBe(true)
-    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
+    expect(store.isGroupAlreadyCreated('2026')).toBe(true)
+    expect(store.selectedGroups.has('2026')).toBe(false)
 
     // toggleGroup ne doit plus pouvoir le resélectionner
-    store.toggleGroup('2026-Q3')
-    expect(store.selectedGroups.has('2026-Q3')).toBe(false)
+    store.toggleGroup('2026')
+    expect(store.selectedGroups.has('2026')).toBe(false)
 
     // un appel createSelected supplémentaire ne recrée pas la playlist
-    store.selectedGroups.add('2026-Q3')
+    store.selectedGroups.add('2026')
     await store.createSelected()
     expect(createPlaylist).toHaveBeenCalledTimes(1)
   })
 
   it('createSelected utilise le nom personnalisé quand il a été défini', async () => {
     vi.mocked(createPlaylist).mockResolvedValue({
-      id: 'pl-q3',
-      external_urls: { spotify: 'https://open.spotify.com/pl-q3' },
+      id: 'pl-2026',
+      external_urls: { spotify: 'https://open.spotify.com/pl-2026' },
     })
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
-    store.setPlaylistName('2026-Q3', 'Été chill')
+    store.toggleGroup('2026')
+    store.setPlaylistName('2026', 'Été chill')
     await store.createSelected()
 
     expect(createPlaylist).toHaveBeenCalledWith('token', 'Été chill')
@@ -238,44 +276,44 @@ describe('usePlaylistsStore', () => {
 
   it('createSelected exclut les titres décochés de la playlist créée', async () => {
     vi.mocked(createPlaylist).mockResolvedValue({
-      id: 'pl-q3',
-      external_urls: { spotify: 'https://open.spotify.com/pl-q3' },
+      id: 'pl-2026',
+      external_urls: { spotify: 'https://open.spotify.com/pl-2026' },
     })
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
-    store.toggleTrackExclusion('2026-Q3', '1')
+    store.toggleGroup('2026')
+    store.toggleTrackExclusion('2026', '1')
     await store.createSelected()
 
-    expect(addTracksToPlaylist).toHaveBeenCalledWith('token', 'pl-q3', [])
+    expect(addTracksToPlaylist).toHaveBeenCalledWith('token', 'pl-2026', [])
   })
 
   it('continue avec les groupes suivants si la création échoue pour un groupe', async () => {
     vi.mocked(createPlaylist)
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce({
-        id: 'pl-q2',
-        external_urls: { spotify: 'https://open.spotify.com/pl-q2' },
+        id: 'pl-2025',
+        external_urls: { spotify: 'https://open.spotify.com/pl-2025' },
       })
     vi.mocked(addTracksToPlaylist).mockResolvedValue(undefined)
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
-    store.toggleGroup('2026-Q2')
+    store.toggleGroup('2026')
+    store.toggleGroup('2025')
     await store.createSelected()
 
     expect(store.results).toHaveLength(2)
-    expect(store.results.find((r) => r.groupKey === '2026-Q3')?.success).toBe(false)
-    expect(store.results.find((r) => r.groupKey === '2026-Q2')?.success).toBe(true)
+    expect(store.results.find((r) => r.groupKey === '2026')?.success).toBe(false)
+    expect(store.results.find((r) => r.groupKey === '2025')?.success).toBe(true)
   })
 
   it('propage une TokenExpiredError sans traiter les groupes suivants', async () => {
     vi.mocked(createPlaylist).mockRejectedValue(new TokenExpiredError())
 
     const store = usePlaylistsStore()
-    store.toggleGroup('2026-Q3')
-    store.toggleGroup('2026-Q2')
+    store.toggleGroup('2026')
+    store.toggleGroup('2025')
 
     await expect(store.createSelected()).rejects.toThrow(TokenExpiredError)
     expect(createPlaylist).toHaveBeenCalledTimes(1)

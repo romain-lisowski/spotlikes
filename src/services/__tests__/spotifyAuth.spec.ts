@@ -13,7 +13,9 @@ describe('buildAuthorizeUrl', () => {
     expect(parsed.origin + parsed.pathname).toBe('https://accounts.spotify.com/authorize')
     expect(parsed.searchParams.get('client_id')).toBe('test-client-id')
     expect(parsed.searchParams.get('response_type')).toBe('code')
-    expect(parsed.searchParams.get('scope')).toBe('user-library-read playlist-modify-private')
+    expect(parsed.searchParams.get('scope')).toBe(
+      'user-library-read playlist-modify-private ugc-image-upload',
+    )
     expect(parsed.searchParams.get('code_challenge_method')).toBe('S256')
     expect(parsed.searchParams.get('code_challenge')).toBeTruthy()
     expect(parsed.searchParams.get('state')).toBeTruthy()

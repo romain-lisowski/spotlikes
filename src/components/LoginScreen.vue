@@ -6,7 +6,7 @@ defineEmits<{
 const FEATURES = [
   {
     icon: '🗂️',
-    title: 'Trimestre ou genre',
+    title: 'Année ou genre',
     text: 'Choisis comment regrouper tes titres likés.',
   },
   {
@@ -26,8 +26,8 @@ const FEATURES = [
   <div class="login-screen">
     <h1>Tes likes Spotify, enfin rangés.</h1>
     <p class="tagline">
-      Regroupe tes titres likés par trimestre ou par genre, et crée une playlist prête à écouter en
-      un clic.
+      Regroupe tes titres likés par année ou par genre, et crée une playlist prête à écouter en un
+      clic.
     </p>
     <button type="button" @click="$emit('login')">Se connecter à Spotify</button>
 

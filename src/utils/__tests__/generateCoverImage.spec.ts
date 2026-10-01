@@ -20,13 +20,23 @@ describe('wrapText', () => {
 })
 
 describe('paletteFor', () => {
-  it('est déterministe pour un même seed', () => {
-    expect(paletteFor('indie pop')).toEqual(paletteFor('indie pop'))
+  it('est déterministe pour un même seed et un même type', () => {
+    expect(paletteFor('indie pop', 'genre')).toEqual(paletteFor('indie pop', 'genre'))
   })
 
   it('retourne toujours une paire de couleurs valide', () => {
-    const [colorA, colorB] = paletteFor('classic rock')
+    const [colorA, colorB] = paletteFor('classic rock', 'genre')
     expect(colorA).toMatch(/^#[0-9a-f]{6}$/i)
     expect(colorB).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+
+  it('utilise des palettes différentes pour "genre" et "year"', () => {
+    const genrePalettes = new Set(
+      ['indie pop', 'rock', 'jazz'].map((s) => paletteFor(s, 'genre')[0]),
+    )
+    const yearPalettes = new Set(['2024', '2025', '2026'].map((s) => paletteFor(s, 'year')[0]))
+    for (const color of yearPalettes) {
+      expect(genrePalettes.has(color)).toBe(false)
+    }
   })
 })

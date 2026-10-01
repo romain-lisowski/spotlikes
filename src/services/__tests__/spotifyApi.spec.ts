@@ -149,7 +149,7 @@ describe('createPlaylist', () => {
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe('https://api.spotify.com/v1/me/playlists')
     const body = JSON.parse(init!.body as string)
-    expect(body).toEqual({ name: 'Likes — septembre 2026', public: false })
+    expect(body).toEqual({ name: 'Likes — septembre 2026', public: false, description: '' })
   })
 })
 

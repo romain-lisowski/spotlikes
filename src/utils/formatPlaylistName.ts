@@ -1,80 +1,39 @@
-import { UNKNOWN_GENRE, formatGenreLabel, MERGED_KEY_PREFIX } from './groupByGenre'
+import { UNKNOWN_GENRE, FALLBACK_FAMILY } from './groupByGenre'
+import { YEAR_KEY_PATTERN } from './groupByYear'
 
-export function formatQuarterLabel(quarterKey: string): string {
-  const [yearPart, quarterPart] = quarterKey.split('-Q')
-  return `T${quarterPart} ${yearPart}`
+// Un mot par famille de genre, choisi pour évoquer le style. Aucun mot n'est
+// réutilisé d'une famille à l'autre.
+const THEMATIC_WORD_BY_FAMILY: Record<string, string> = {
+  'Hip-Hop': 'Rhythmic',
+  Metal: 'Crushing',
+  Punk: 'Reckless',
+  Electro: 'Pulsing',
+  Chill: 'Hazy',
+  Rock: 'Amplified',
+  Disco: 'Glittering',
+  Soul: 'Groovy',
+  Blues: 'Gritty',
+  Jazz: 'Smoky',
+  Classique: 'Timeless',
+  Country: 'Rustic',
+  Latin: 'Fiery',
+  Reggae: 'Sunny',
+  Pop: 'Catchy',
+  World: 'Global',
+  [FALLBACK_FAMILY]: 'Mixed',
 }
 
-function hashString(value: string): number {
-  let hash = 0
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
-  }
-  return hash
+function genreNameFor(family: string): string {
+  if (family === UNKNOWN_GENRE) return 'Mystery Mix'
+  const word = THEMATIC_WORD_BY_FAMILY[family] ?? THEMATIC_WORD_BY_FAMILY[FALLBACK_FAMILY]
+  return `${word} ${family}`
 }
 
-function pick<T>(items: T[], seed: string): T {
-  return items[hashString(seed) % items.length]!
-}
-
-const GENRE_ADJECTIVES = [
-  'Dirty',
-  'Electric',
-  'Mellow',
-  'Golden',
-  'Midnight',
-  'Velvet',
-  'Wild',
-  'Hazy',
-  'Neon',
-  'Smooth',
-  'Raw',
-  'Dreamy',
-  'Sunset',
-  'Feral',
-  'Silver',
-  'Crimson',
-  'Frozen',
-  'Blazing',
-  'Lush',
-  'Faded',
-  'Amber',
-  'Cosmic',
-  'Restless',
-  'Quiet',
-  'Loud',
-  'Vivid',
-  'Rusty',
-  'Warm',
-  'Static',
-  'Analog',
-  'Nostalgic',
-  'Fearless',
-  'Tender',
-  'Gritty',
-  'Bold',
-  'Bright',
-  'Distant',
-  'Endless',
-  'Secret',
-  'Reckless',
-]
-
-const QUARTER_KEY_PATTERN = /^\d{4}-Q[1-4]$/
-
-function genreNameFor(genreKey: string): string {
-  if (genreKey === UNKNOWN_GENRE) return 'Mystery Mix'
-  return `${pick(GENRE_ADJECTIVES, genreKey)} ${formatGenreLabel(genreKey)}`
-}
-
-// Les playlists par trimestre gardent le nom brut ("T1 2022") ; seules les
-// playlists par genre reçoivent un nom généré, plus accrocheur.
+// Les playlists par année gardent le nom brut ("2026") ; seules les playlists
+// par genre reçoivent un nom généré, en lien avec la famille musicale.
 export function formatPlaylistName(group: { key: string }): string {
-  if (QUARTER_KEY_PATTERN.test(group.key)) {
-    return formatQuarterLabel(group.key)
+  if (YEAR_KEY_PATTERN.test(group.key)) {
+    return group.key
   }
-  const key = group.key.startsWith(MERGED_KEY_PREFIX)
-    ? group.key.slice(MERGED_KEY_PREFIX.length)
-    : group.key
-  return genreNameFor(key)
+  return genreNameFor(group.key)
 }

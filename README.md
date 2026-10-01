@@ -1,6 +1,6 @@
 # Spotlikes
 
-Regroupe tes titres Spotify likés par trimestre ou par genre, et crée une playlist privée pour chacun des groupes sélectionnés.
+Regroupe tes titres Spotify likés par année ou par genre, et crée une playlist privée pour chacun des groupes sélectionnés.
 
 ## Configuration Spotify (à faire une seule fois)
 
@@ -25,7 +25,7 @@ Spotify restreint l'accès aux données de genre pour les apps en Development Mo
    VITE_LASTFM_API_KEY=<ta_clé>
    ```
 
-Sans cette clé, le mode "Par genre" ne fonctionnera pas ; "Par trimestre" reste utilisable normalement.
+Sans cette clé, le mode "Par genre" ne fonctionnera pas ; "Par année" reste utilisable normalement.
 
 Les genres récupérés sont mis en cache dans le `localStorage` du navigateur (par nom d'artiste), pour éviter de refaire un appel Last.fm à chaque session pour un artiste déjà interrogé.
 
@@ -41,7 +41,7 @@ npm install
 npm run dev
 ```
 
-Ouvre `http://127.0.0.1:5173` (et non `localhost`, pour matcher la Redirect URI déclarée côté Spotify), clique sur "Se connecter à Spotify", choisis un mode de regroupement (trimestre ou genre), ajuste le nom des playlists et les titres à exclure si besoin, puis crée les playlists sélectionnées.
+Ouvre `http://127.0.0.1:5173` (et non `localhost`, pour matcher la Redirect URI déclarée côté Spotify), clique sur "Se connecter à Spotify", choisis un mode de regroupement (année ou genre), ajuste le nom des playlists et les titres à exclure si besoin, puis crée les playlists sélectionnées.
 
 **Note** : l'access token n'est jamais persisté (ni disque, ni storage) — il vit uniquement en mémoire le temps de la session. Un rechargement de page nécessite de se reconnecter.
 

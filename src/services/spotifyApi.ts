@@ -86,7 +86,7 @@ export async function createPlaylist(
   const response = await spotifyFetch(accessToken, `${SPOTIFY_API_BASE_URL}/me/playlists`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, public: false }),
+    body: JSON.stringify({ name, public: false, description: '' }),
   })
   return response.json()
 }
