@@ -25,3 +25,13 @@
 - Gestion de plusieurs comptes Spotify
 - Édition d'une playlist déjà créée
 - Pagination au-delà d'une boucle simple sur `/me/tracks`
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
