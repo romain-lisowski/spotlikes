@@ -2,7 +2,7 @@ import type { LikedTrack, TrackGroup } from '@/types/spotify'
 
 export const UNKNOWN_GENRE = 'Genre inconnu'
 export const FALLBACK_FAMILY = 'Autres'
-export const SMALL_FAMILY_TRACK_THRESHOLD = 20
+const SMALL_FAMILY_TRACK_THRESHOLD = 20
 
 export function normalizeGenreKey(genre: string): string {
   return genre
